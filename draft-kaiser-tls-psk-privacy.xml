@@ -1,0 +1,296 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE rfc SYSTEM "rfc2629.dtd" [
+
+<!ENTITY rfc2119 PUBLIC ''
+   'http://xml2rfc.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml'>
+<!ENTITY rfc8446 PUBLIC ''
+   'http://xml2rfc.ietf.org/public/rfc/bibxml/reference.RFC.8446.xml'>
+
+]>
+
+<?xml-stylesheet type='text/xsl' href='rfc2629.xslt' ?>
+<?rfc compact="yes"?>
+<?rfc toc="yes"?>
+<?rfc symrefs="yes"?>
+<?rfc sortrefs="yes"?>
+
+<!-- Expand crefs and put them inline -->
+<?rfc comments='yes' ?>
+<?rfc inline='yes' ?>
+
+<rfc category="std"
+     docName="draft-kaiser-tls-psk-privacy-00"
+     ipr="trust200902">
+
+<front>
+    <title abbrev="TLS 1.3 PSK Priv Auth">
+      PSK-Based Mutual Private Authentication Mode for TLS 1.3
+    </title>
+
+   <author fullname="Daniel Kaiser" initials="D." surname="Kaiser">
+      <organization>University of Luxembourg</organization>
+      <address>
+        <postal>
+          <street>6, avenue de la Fonte</street>
+          <city>Esch-sur-Alzette</city>
+          <code>4364</code>
+          <region></region>
+          <country>Luxembourg</country>
+        </postal>
+        <email>daniel.kaiser@uni.lu</email>
+        <uri>https://secan-lab.uni.lu/</uri>
+      </address>
+    </author>
+
+   <author fullname="Christian Huitema" initials="C." surname="Huitema">
+      <organization>Private Octopus Inc.</organization>
+      <address>
+        <postal>
+          <street></street>
+          <city>Friday Harbor</city>
+          <code>98250</code>
+          <region>WA</region>
+          <country>U.S.A.</country>
+        </postal>
+        <email>huitema@huitema.net</email>
+        <uri>http://privateoctopus.com/</uri>
+      </address>
+    </author>
+
+
+    <date year="2018" />
+
+    <abstract>
+<t>
+  This document specifies a new extension, eid_pre_shared_key, which allows the TLS 1.3 handshake to
+  support mutual private authentication, meaning the endpoints only disclose their identities to their respective peer
+  if the peer actually is who it claims to be.
+  This is achieved by introducing ephemeral identifiers as PSK identities, which are time-based and only interpretable by an authorized peer.
+  Mutual private authentication is especially desired for privacy preserving applications in which devices can act as both client and server.
+</t>
+    </abstract>
+</front>
+
+<middle>
+<section title="Introduction">
+<t>
+  [[TODO]]
+</t>
+
+<t>
+  This document defines ephemeral PSK identifiers for TLS 1.3 <xref target="RFC8446" />.
+  These identifiers allow mutual private authentication when using the PSK based handshake.
+</t>
+
+<section title="Requirements">
+<t>
+  The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+  "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
+  document are to be interpreted as described in <xref target="RFC2119" />.
+</t>
+</section>
+</section>
+
+<section title="TLS 1.3 Handshake Supporting Mutual Private Authentication" anchor="priv-auth">
+
+<t>
+  The "eid_pre_shared_key" extension specified in <xref target="eid-psk-extension" /> allows establishing a mutually authenticated TLS 1.3 session in
+  a privacy preserving way. This allows clients to negotiate a mutual private authentication mode.
+  The mutual private authentication mode specified in this document is based on the TLS 1.3 PSK handshake.
+</t>
+
+<t>
+  [[In the future, we could introduce a more general private_authentication_modes extension that indicates the client's wish to
+  perform private authentication and contains a list of private authentication modes; one of which might be the one described in this document,
+  others might be based on special certificates and zero knowledge proofs.]]
+</t>
+
+
+<t>
+  A client that wants to negotiate a TLS 1.3 session in mutual private authentication mode
+  MUST send a eid_pre_shared_key extension, as defined in <xref target="eid-psk-extension" />.
+  It MUST NOT send a pre_shared_key extension. Further, it MUST NOT send messages or extensions that contain the client's
+  identity or data that might allow inferring the client's identity. <xref target="mess-id" /> lists these messages and extensions.
+  By sending an eid_pre_shared_key extension, the client indicates that it wants to negotiate in mutual private authentication mode.
+</t>
+
+<t>
+  A server supporting mutual private authentication mode receiving an eid_pre_shared_key extension MUST send back an eid_pre_shared_key extension
+  containing an ephemeral_identity for the chosen PSK.
+  It MUST NOT ask the client for a certificate.
+  If the server does not support the mutual private authentication mode it must abort sending an alert [[TODO: which altert?]].
+</t>
+
+<t>
+  A server that does not want to disclose its identity to unauthenticated clients MUST
+  abort any handshake that does not contain an eid_pre_shared_key extension.
+  [[SHOULD it send back an alert? If so, the alert MUST NOT contain traceable information.]]
+</t>
+
+<t>
+  The following diagram illustrates a TLS 1.3 handshake using the eid_pre_shared_key extension. The diagram is based on
+  the PSK handshake diagram in <xref target="RFC8446" /> Section 2.2.
+  The handshake does not comprise any messages or extensions that directly or indirectly hold the identity of either endpoint, e.g. certificates.
+</t>
+
+<t>
+<figure>
+<artwork>
+       Client                                           Server
+
+Key  ^ ClientHello
+Exch | + key_share*
+     | + psk_key_exchange_modes*
+     v + eid_pre_shared_key*  --------&gt;
+                                               ServerHello  ^ Key
+                                              + key_share*  | Exch
+                                     + eid_pre_shared_key*  v
+                                     {EncryptedExtensions}  ^  Server
+                                                            v  Params
+                                                 {Finished} ^  Auth
+                                                            v
+                             &lt;-------- [Application Data*]
+Auth ^
+     v {Finished}            --------&gt;
+       [Application Data]    &lt;-------&gt; [Application Data]
+</artwork>
+</figure>
+</t>
+
+
+<section title="Messages and Extensions Containing Identifiable Information" anchor="mess-id">
+  <t>
+    [[TODO]]
+  </t>
+</section>
+</section>
+
+<section title="Ephemeral PSK Identity Extension" anchor="eid-psk-extension">
+
+<t>
+  As the "extension_data" field of the "pre_shared_key" extension specified in <xref target="RFC8446" /> Section 4.2.11
+  is comprised of a "PreSharedKeyExtension",
+  the "extension_data" field of the "eid_pre_shared_key" extension specified in this section is comprised of
+  an "EIDPreSharedKeyExtension" value, which is defined as:
+</t>
+
+<t>
+ <figure>
+<artwork>
+struct {
+    opaque ephemeral_identity[hash.length];
+} EphemeralPskIdentity;
+
+opaque PskBinderEntry&lt;132..255&gt;;
+
+struct {
+    EphemeralPskIdentity ephemeral_identities&lt;7..2^16-1&gt;;
+    PskBinderEntry binders&lt;33..2^16-1&gt;;
+} OfferedPsks;
+
+struct {
+    select (Handshake.msg_type) {
+        case client_hello: OfferedPsks;
+        case server_hello: uint16 selected_identity;
+    };
+} EIDPreSharedKeyExtension;
+</artwork>
+</figure>
+</t>
+
+<t>
+  Besides different names and semantics, the structural differences between the standard "PskIdentity" struct and
+  the "EphemeralPskIdentity" struct defined in this document are as follows.
+  (1) The "ephemeral_identity" field has a fixed length corresponding to the output length of the hash function in the
+  negotiated cipher suite.
+  Further, (2) the "ephemeral_identity" struct does not have an obfuscated_ticket_age field, which is normally used in conjunction with
+  PSKs that have been established via a previous certificate based handshake.
+  The ephemeral_identity struct is specified in <xref target="eph-id-gen" />.
+  The remainder of the values work as defined in <xref target="RFC8446" />.
+</t>
+
+<t>
+  [[Should we explicitly require externally established keys for the new mode of operation?
+  PSKs established via certificates would have lead to a privacy leak in the past...
+  If we were to include a ticket age mechanism, we need to care that it does not introduce traceable information.]]
+</t>
+
+
+<section title="Generating Ephemeral PSK Identities" anchor="eph-id-gen">
+  <t>
+    Ephemeral PSK Identifiers are calculated as follows.
+  </t>
+<t>
+ <figure>
+   <artwork>
+  timestamp = 64 bit Unix GMT time
+  seed = 56 most significant bits of timestamp padded with 0s
+  ephemeral_early_secret = HKDF-Extract(PSK, timestamp)
+  ephemeral_identity = HKDF-Expand-Label(ephemeral_early_secret,
+                                         "eph-id", hash.length)
+</artwork>
+</figure>
+</t>
+
+<t>
+  [[For efficiency reasons, we could also use ephemeral_identity = HKDF-Expand-Label(binder_key, "eph-id", hash.length)]] or
+  even just HMAC(seed, PSK). But first generating a separate secret fits better into the TLS 1.3 key schedule.]]
+</t>
+
+</section>
+
+<section title="Verifying Ephemeral PSK Identities" anchor="eph-id-ver">
+
+<t>
+  A server supporting mutual private authentication mode receiving an eid_pre_shared_key extension
+  checks whether the provided ephemeral key identities match valid PSKs and if so,
+  chooses one of the PSKs and sends back an eid_pre_shared_key extension containing an ephemeral identity for that key.
+  The server MUST also take the two surrounding time intervals into consideration when checking ephemeral PSK Identities.
+</t>
+
+<t>
+  In case of heavily skewed clocks, the connection establishment fails even if both parties hold valid PSKs.
+  [[This problem could be mitigated by prepending the seed to the ephemeral identity. However, this mitigation technique would
+  allow tracking heavily skewed clocks.]]
+</t>
+
+<t>
+  Servers SHOULD compute a hash table mapping all ephemeral identities valid in
+  the current time interval to the corresponding PSKs.
+  Servers SHOULD maintain hash tables for the surrounding time intervals as well.
+  This allows checking in O(1) and thus mitigates DoS attacks.
+</t>
+</section>
+
+
+</section>
+
+<section title="Security Considerations" anchor="security">
+  <t>
+    [[TODO]]
+  </t>
+</section>
+
+<section title="IANA Considerations" anchor="iana">
+<t>
+    [[TODO]]
+</t>
+</section>
+
+<section title="Acknowledgments">
+    <t>
+    </t>
+</section>
+
+</middle>
+
+<back>
+<references title="Informative References">
+  &rfc2119;
+  &rfc8446;
+
+
+</references>
+</back>
+</rfc>
