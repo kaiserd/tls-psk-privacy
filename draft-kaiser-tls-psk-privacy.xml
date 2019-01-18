@@ -79,12 +79,23 @@
 <middle>
 <section title="Introduction">
 <t>
-  [[TODO]]
+  TLS 1.3 <xref target="RFC8446" /> specifies how session keys can be derived from Pre Shared Keys (PSK). In that mode,
+  the PSK proposed by clients and selected by servers are identified by PSK Identifiers. The specification envisages
+  two types of PSK: keys that are obtained during a session establishment and can be used for session resumption;
+  and keys that are established out of band. The  latter type of key is typically valid for a significant time. We
+  are concerned that if the key identifier remains constant for a long period of time, it can be used for
+  tracking the client and server.
 </t>
 
 <t>
   This document defines ephemeral PSK identifiers for TLS 1.3 <xref target="RFC8446" />.
   These identifiers allow private mutual authentication when using the PSK based handshake.
+</t>
+
+<t>
+  Besides PSK indentifiers, there may be other data sent during the handshake that could be used to
+  track client or servers. Obviously, the handshake privacy will only be achieved if the clients and
+  servers refrain from providing such data, as explained in <xref target="mess-id" />.
 </t>
 
 <section title="Requirements">
@@ -106,8 +117,8 @@
   A client that wants to negotiate a TLS 1.3 session using ephemeral PSK-IDs
   MUST send an eid_pre_shared_key extension, as defined in <xref target="eid-psk-extension" />.
   It MUST NOT send a pre_shared_key extension.
+  [[ TODO: Really? what about using session resumption tickets? These are PSK ID too. Do we want to prevent them? ]]
 </t>
-  
 <t>
   If private mutual authentication is desired, the client SHOULD NOT send messages or extensions that contain the client's
   identity or data that might allow inferring the client's identity. <xref target="mess-id" /> lists these messages and extensions.
@@ -125,6 +136,7 @@
   A server that does not want to disclose its identity to unauthenticated clients MUST
   abort any handshake that does not contain an eid_pre_shared_key extension.
   [[SHOULD it send back an alert? If so, the alert MUST NOT contain traceable information.]]
+  [[Really? Suppose the client sends an ESNI encrypted with a key that is only known to authorized clients. Is that forbidden to?]]
 </t>
 
 <t>
@@ -157,12 +169,23 @@ Auth ^
 </figure>
 </t>
 
-
 <section title="Messages and Extensions Containing Identifiable Information" anchor="mess-id">
   <t>
     [[TODO]]
+    [[Obviously, do not state the server identity in a clear text SNI if server privacy is desired.
+    What else? Also, what if servers actually handle multiple services and would like to use the SNI?
+    Need to state that the SNI is implied by the selected PSK-ID.]]
+  </t>
+  <t>
+    [[Should we say something about server cert? It is not required in a PSK exchange. It does
+    identify the server. But it is sent encrypted, and encryption assumes knowledge of the PSK,
+    so there is little risk there.]]
+  </t>
+  <t>
+    Anything else? Fingerprinting through set of extensions?
   </t>
 </section>
+
 </section>
 
 <section title="Ephemeral PSK Identity Extension" anchor="eid-psk-extension">
