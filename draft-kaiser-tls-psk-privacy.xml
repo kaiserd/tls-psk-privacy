@@ -7,6 +7,9 @@
 <!ENTITY rfc8446 PUBLIC ''
    'http://xml2rfc.ietf.org/public/rfc/bibxml/reference.RFC.8446.xml'>
 
+<!ENTITY I-D.ietf-tls-esni PUBLIC ''
+   "http://xml2rfc.ietf.org/public/rfc/bibxml3/reference.I-D.ietf-tls-esni.xml">
+
 ]>
 
 <?xml-stylesheet type='text/xsl' href='rfc2629.xslt' ?>
@@ -63,12 +66,12 @@
 
     <abstract>
 <t>
-  This document specifies a new extension, eid_pre_shared_key, introducing
-  privacy-preserving ephemeral identifiers as PSK identities, which are time-based and only interpretable by an authorized peer.
+  This document introduces privacy-preserving ephemeral identifiers as PSK identities,
+  which are time-based and only interpretable by an authorized peer.
 </t>
 
 <t>
-  The new extension allows the TLS 1.3 handshake to
+  Ephemeral PSK identities allow the TLS 1.3 handshake to
   support private mutual authentication, meaning the endpoints authenticate each other
   while only disclosing their identities to their respective peer if the peer actually is who it claims to be.
   Private mutual authentication is especially desired for privacy preserving applications in which devices can act as both client and server.
@@ -80,7 +83,7 @@
 <section title="Introduction">
 <t>
   TLS 1.3 <xref target="RFC8446" /> specifies how session keys can be derived from Pre Shared Keys (PSK). In that mode,
-  the PSK proposed by clients and selected by servers are identified by PSK Identifiers. The specification envisages
+  the PSK proposed by clients and selected by servers are identified by PSK identifiers. The specification envisages
   two types of PSK: keys that are obtained during a session establishment and can be used for session resumption;
   and keys that are established out of band. The  latter type of key is typically valid for a significant time. We
   are concerned that if the key identifier remains constant for a long period of time, it can be used for
@@ -110,39 +113,46 @@
 <section title="TLS 1.3 Handshake Supporting Privacy-Preserving PSK-IDs" anchor="priv-auth">
 
 <t>
-  The "eid_pre_shared_key" extension specified in <xref target="eid-psk-extension" /> introduces privacy-preserving ephemeral PSK-IDs.
-</t>
-
-<t>
   A client that wants to negotiate a TLS 1.3 session using ephemeral PSK-IDs
-  MUST send an eid_pre_shared_key extension, as defined in <xref target="eid-psk-extension" />.
-  It MUST NOT send a pre_shared_key extension.
-  [[ TODO: Really? what about using session resumption tickets? These are PSK ID too. Do we want to prevent them? ]]
+  MUST generate an ephemeral PSK identity as defined in <xref target="eph-id-gen" /> and
+  send a pre_shared_key extension containing this ephemeral PSK ID.
 </t>
 <t>
   If private mutual authentication is desired, the client SHOULD NOT send messages or extensions that contain the client's
   identity or data that might allow inferring the client's identity. <xref target="mess-id" /> lists these messages and extensions.
-  By sending an eid_pre_shared_key extension, the client indicates that it wants to negotiate in mutual private authentication mode.
+  <!-- By sending an eid_pre_shared_key extension, the client indicates that it wants to negotiate in mutual private authentication mode. -->
+  [[TODO: Should there be an indication that lets the server know the client wants to establish a session using ephemeral PSK IDs?
+  As currently described, the server needs to check both the standard PSK IDs and the eph ID table.]]
 </t>
 
 <t>
-  A server supporting ephemeral PSK-IDs receiving an eid_pre_shared_key extension MUST send back an eid_pre_shared_key extension
-  containing an ephemeral_identity for the chosen PSK.
+  A server supporting ephemeral PSK-IDs receiving a pre_shared_key extension
+  containing an ephemeral PSK identity for the chosen PSK will process it according to <xref target="eph-id-ver" />.
+  If the server does not have a matching PSK, it will proceed in same way as when not having a PSK matching any standard PSK ID.
   It MUST NOT ask the client for a certificate.
-  If the server does not support ephemeral PSK-IDs it must abort sending an alert [[TODO: which altert?]].
 </t>
 
 <t>
   A server that does not want to disclose its identity to unauthenticated clients MUST
-  abort any handshake that does not contain an eid_pre_shared_key extension.
-  [[SHOULD it send back an alert? If so, the alert MUST NOT contain traceable information.]]
-  [[Really? Suppose the client sends an ESNI encrypted with a key that is only known to authorized clients. Is that forbidden to?]]
+  abort any handshake that neither contains
+  <list style="numbers">
+    <t>
+      a valid ephemeral PSK ID, nor
+    </t>
+    <t>
+      an ESNI encrypted with a key that is only known to authorized clients as described in <xref target="I-D.ietf-tls-esni" />.
+      [[However, other clients in possession of this key will learn about the connection establishment.]]
+    </t>
+  </list>
+  [[SHOULD it send back an alert? If so, the alert MUST NOT contain traceable information.
+  The server could react in the same as when none of the PSK-IDs offered by the client match.]]
 </t>
 
 <t>
-  The following diagram illustrates a TLS 1.3 handshake using the eid_pre_shared_key extension. The diagram is based on
+  The following diagram illustrates a TLS 1.3 handshake using the pre_shared_key extension. The diagram is based on
   the PSK handshake diagram in <xref target="RFC8446" /> Section 2.2.
   The handshake does not comprise any messages or extensions that directly or indirectly hold the identity of either endpoint, e.g. certificates.
+  The new semantics of the identify field within the pre_shared_key extension are specified in <xref target="eph-id" />.
 </t>
 
 <t>
@@ -153,10 +163,10 @@
 Key  ^ ClientHello
 Exch | + key_share*
      | + psk_key_exchange_modes*
-     v + eid_pre_shared_key*  --------&gt;
+     v + pre_shared_key*  --------&gt;
                                                ServerHello  ^ Key
                                               + key_share*  | Exch
-                                     + eid_pre_shared_key*  v
+                                     + pre_shared_key*  v
                                      {EncryptedExtensions}  ^  Server
                                                             v  Params
                                                  {Finished} ^  Auth
@@ -168,6 +178,18 @@ Auth ^
 </artwork>
 </figure>
 </t>
+
+<section title="Session Tickets" anchor="tickets">
+
+  <t>
+    As described in <xref target="RFC8446" /> Section 4.6.1.,
+    the server can provide the client with session tickets, each of which is associated with a newly created separate PSK.
+    Using session tickets enables unlinkablity of session establishment requests within a single timeframe.
+    Clients SHOULD send a ticket only once, as messages containing the same ticket are linkable.
+    Servers MUST accept a ticket only for a single connection establishment.
+  </t>
+
+</section>
 
 <section title="Messages and Extensions Containing Identifiable Information" anchor="mess-id">
   <t>
@@ -188,58 +210,44 @@ Auth ^
 
 </section>
 
-<section title="Ephemeral PSK Identity Extension" anchor="eid-psk-extension">
+<section title="Ephemeral PSK Identities" anchor="eph-id">
+
+  <t>
+    This document does not introduce new TLS extensions
+    which allows easily upgrading existing implementations.
+    Ephemeral PSK identities are sent via the PreSharedKeyExtension
+    specified in <xref target="RFC8446" /> Section 4.2.11.
+    Only the semantics of the identity field of the PskIdentity struct changes.
+  </t>
 
 <t>
-  As the "extension_data" field of the "pre_shared_key" extension specified in <xref target="RFC8446" /> Section 4.2.11
-  is comprised of a "PreSharedKeyExtension",
-  the "extension_data" field of the "eid_pre_shared_key" extension specified in this section is comprised of
-  an "EIDPreSharedKeyExtension" value, which is defined as:
-</t>
-
-<t>
- <figure>
+<figure>
 <artwork>
-struct {
-    opaque ephemeral_identity[hash.length];
-} EphemeralPskIdentity;
-
-opaque PskBinderEntry&lt;132..255&gt;;
-
-struct {
-    EphemeralPskIdentity ephemeral_identities&lt;7..2^16-1&gt;;
-    PskBinderEntry binders&lt;33..2^16-1&gt;;
-} OfferedPsks;
-
-struct {
-    select (Handshake.msg_type) {
-        case client_hello: OfferedPsks;
-        case server_hello: uint16 selected_identity;
-    };
-} EIDPreSharedKeyExtension;
+  struct {
+    opaque identity&lt;1..2^16-1&gt;;
+    uint32 obfuscated_ticket_age;
+  } PskIdentity;
 </artwork>
 </figure>
 </t>
 
 <t>
-  Besides different names and semantics, the structural differences between the standard "PskIdentity" struct and
-  the "EphemeralPskIdentity" struct defined in this document are as follows.
-  (1) The "ephemeral_identity" field has a fixed length corresponding to the output length of the hash function in the
-  negotiated cipher suite.
-  Further, (2) the "ephemeral_identity" struct does not have an obfuscated_ticket_age field, which is normally used in conjunction with
-  PSKs that have been established via a previous certificate based handshake.
-  The ephemeral_identity struct is specified in <xref target="eph-id-gen" />.
-  The remainder of the values work as defined in <xref target="RFC8446" />.
+ <!-- in the context of private authentication as specified in this document -->
+  identity: an ephemeral identifier for a PSK (as defined in <xref target="eph-id-gen" />)
+  or a single-use ticket (as defined in <xref target="RFC8446" /> Appendix B.3.4.).
 </t>
 
-<t>
-  [[Should we explicitly require externally established keys for the new mode of operation?
-  PSKs established via certificates would have lead to a privacy leak in the past...
-  If we were to include a ticket age mechanism, we need to care that it does not introduce traceable information.]]
-</t>
+
+  <t>
+    [[We also discussed introducing a new eid_pre_shared_key extension;
+    it would make the use of ephemeral PSK identities explicit and allow
+    clients to indicate their wishes to use private authentication.]]
+  </t>
 
 
 <section title="Generating Ephemeral PSK Identities" anchor="eph-id-gen">
+
+
   <t>
     Ephemeral PSK Identifiers are calculated as follows.
   </t>
@@ -248,7 +256,7 @@ struct {
    <artwork>
   timestamp = 64 bit Unix GMT time
   seed = 56 most significant bits of timestamp padded with 0s
-  ephemeral_early_secret = HKDF-Extract(PSK, timestamp)
+  ephemeral_early_secret = HKDF-Extract(PSK, seed)
   ephemeral_identity = HKDF-Expand-Label(ephemeral_early_secret,
                                          "eph-id", hash.length)
 </artwork>
@@ -256,8 +264,9 @@ struct {
 </t>
 
 <t>
-  [[For efficiency reasons, we could also use ephemeral_identity = HKDF-Expand-Label(binder_key, "eph-id", hash.length)]] or
-  even just HMAC(seed, PSK). But first generating a separate secret fits better into the TLS 1.3 key schedule.]]
+  [[For efficiency reasons, we could also use ephemeral_identity = HKDF-Expand-Label(PSK, seed, "eph-id", hash.length),
+  which would be similar to establishing session tickets;
+  or even just HMAC(seed, PSK). But first generating a separate secret fits better into the TLS 1.3 key schedule.]]
 </t>
 
 </section>
@@ -265,10 +274,24 @@ struct {
 <section title="Verifying Ephemeral PSK Identities" anchor="eph-id-ver">
 
 <t>
-  A server supporting ephemeral PSK-IDs receiving an eid_pre_shared_key extension
-  checks whether the provided ephemeral key identities match valid PSKs and if so,
-  chooses one of the PSKs and sends back an eid_pre_shared_key extension containing an ephemeral identity for that key.
-  The server MUST also take the two surrounding time intervals into consideration when checking ephemeral PSK Identities.
+  A server supporting ephemeral PSK-IDs receiving a pre_shared_key extension
+  checks
+  <list style="numbers">
+  <t>
+    if the provided key identities match valid standard PSKs and if not,
+  </t>
+  <t>
+    if the provided key identities are valid ephemeral PSKs.
+  </t>
+  </list>
+  If a match has been found, the server sends back a pre_shared_key extension containing the respective PSK Identity.
+  If the server operates in private authentication mode only, it will not have standard PSK IDs
+  [[an exception to this are standard PSK IDs associated with ESNI keys.]].
+</t>
+  
+<t>
+  When checking the validity of ephemeral PSK identities,
+  the server MUST also take the two surrounding time intervals into consideration when checking ephemeral PSK Identities.
 </t>
 
 <t>
@@ -308,10 +331,14 @@ struct {
 </middle>
 
 <back>
-<references title="Informative References">
+<references title="Normative References">
   &rfc2119;
   &rfc8446;
 
+
+</references>
+<references title="Informative References">
+   &I-D.ietf-tls-esni;
 
 </references>
 </back>
