@@ -72,14 +72,15 @@
 </t>
 
 <t>
-  Ephemeral PSK identities allow the TLS 1.3 handshake to
-  support private mutual authentication, meaning the endpoints authenticate each other
+  Ephemeral PSK identities are part of a set of TLS privacy enhancements, which in its entirety
+  allows the TLS 1.3 handshake to support private mutual authentication, meaning the endpoints authenticate each other
   while only disclosing their identities to their respective peer if the peer actually is who it claims to be.
   Private mutual authentication is especially desired for privacy preserving applications
   in which devices can act as both client and server.
 </t>
+
     </abstract>
-</front>
+  </front>
 
 <middle>
 <section title="Introduction">
@@ -119,14 +120,7 @@
   MUST generate an ephemeral PSK identity as defined in <xref target="eph-id-gen" /> and
   send a pre_shared_key extension containing this ephemeral PSK ID.
 </t>
-<!-- Suppressing the text below, as it will just draw controversy. The client Hello does identify the client, 
-this only comes in post handshake exchanges. 
 <t>
-  If private mutual authentication is desired, the client SHOULD NOT send messages or extensions that contain the client's
-  identity or data that might allow inferring the client's identity. <xref target="mess-id" /> lists these messages and extensions.
--->
-<t>
-  <!-- By sending an eid_pre_shared_key extension, the client indicates that it wants to negotiate in mutual private authentication mode. -->
   [[TODO: Should there be an indication that lets the server know the client wants to establish a session using ephemeral PSK IDs?
   As currently described, the server needs to check both the standard PSK IDs and the eph ID table.]]
 </t>
@@ -135,28 +129,7 @@ this only comes in post handshake exchanges.
   A server supporting ephemeral PSK-IDs receiving a pre_shared_key extension
   containing an ephemeral PSK identity for the chosen PSK will process it according to <xref target="eph-id-ver" />.
   If the server does not have a matching PSK, it will proceed in same way as when not having a PSK matching any standard PSK ID.
-<!-- suppressing this, as it depends on application profiles. The general behavior is that the server falls back to non-PSK key exchange
-  It MUST NOT ask the client for a certificate.
--->
 </t>
-
-<!-- I would like to suppress this too, because it is a matter of profile. Also the reference to ESNI will just complicate draft processing.
-<t>
-  A server that does not want to disclose its identity to unauthenticated clients MUST
-  abort any handshake that neither contains
-  <list style="numbers">
-    <t>
-      a valid ephemeral PSK ID, nor
-    </t>
-    <t>
-      an ESNI encrypted with a key that is only known to authorized clients as described in <xref target="I-D.ietf-tls-esni" />.
-      [[However, other clients in possession of this key will learn about the connection establishment.]]
-    </t>
-  </list>
-  [[SHOULD it send back an alert? If so, the alert MUST NOT contain traceable information.
-  The server could react in the same as when none of the PSK-IDs offered by the client match.]]
-</t>
--->
 
 <t>
   The following diagram illustrates a TLS 1.3 handshake using the pre_shared_key extension. The diagram is based on
@@ -189,35 +162,17 @@ Auth ^
 </figure>
 </t>
 
-<!-- Why do we need this section at all? The issue is debated at length in section 8 of RFC 8446.
-You are trying to close a privacy hole that happens if clients reuse the same ticket many times,
-but that's actually already discussed in section C.4 of RFC 8446.
-
-<section title="Session Tickets" anchor="tickets">
-
-  <t>
-    As described in <xref target="RFC8446" /> Section 4.6.1.,
-    the server can provide the client with session tickets, each of which is associated with a newly created separate PSK.
-    Using session tickets enables unlinkablity of session establishment requests within a single timeframe.
-    Clients SHOULD send a ticket only once, as messages containing the same ticket are linkable.
-    Servers MUST accept a ticket only for a single connection establishment.
-  </t>
-
-</section>
--->
-
-
 </section>
 
 <section title="Ephemeral PSK Identities" anchor="eph-id">
 
   <t>
     PSK identities are used for PSK handshakes, as defined in section 2.2. of
-    <xref target="RFC8446" />. This section introduces two classes of PSK: 
-    session tickets, which the are sent by the servers in the
-    ..., and PSK that are provisioned out of band. In the out of band case,
-    the server is expected to provision as well the PSK Identity and the
-    KDF hash algorithm.
+    <xref target="RFC8446" />. This section introduces two classes of PSK:
+    session tickets, which the are sent by servers as a means for efficiently establishing subsequent connections,
+    and PSKs that are provisioned out-of-band. In the out-of-band case,
+    the server is expected to provision the PSK Identity and the
+    KDF hash algorithm as well.
 </t>
 <t>
    PSK identities are sent via the PreSharedKeyExtension
@@ -327,11 +282,11 @@ rounded version of the current time as a the nonce. An alternative design would
 compose the identity by encoding both the nonce and a hash of the nonce.
 </t>
 <t>
-We constrain the nonce to be time based. This limit the cost of identity retrieval at the
+We constrain the nonce to be time based. This limits the cost of identity retrieval at the
 server. In the general case, a server managing N clients with N provisioned identities
 would have to perform O(N) hash operations to assess whether one of the resulting
 hashes matches the incoming identity. If the nonce is time based and varies once per
-time interval T, the server only has to perform these O(N) computations at each interval T.
+time interval T, the server only has to perform these O(N) computations once per interval T.
 After that, each key identity can be retrieved in O(1) operations, as explained in
 <xref target="eph-id-ver" />.
 </t>
@@ -354,7 +309,7 @@ With longer intervals, there is a risk that a mobile client will issue a second
 connection request within the same interval but from a different location.
 </t>
 <t>
-If client and server clocks are slightly our of sync, very short intervals could result
+If client and server clocks are slightly out of sync, very short intervals could result
 in frequent connection failures.
 </t>
 </list>
@@ -387,7 +342,7 @@ used to fingerprint the client.
 </t>
 <t>
 This probably is not an exhaustive list. The purpose of this document is to address the specific
-issue of tracking through slow changing PSK Identity. We expect that ESNI and other efforts
+issue of tracking through slowly changing PSK Identities. We expect that ESNI and other efforts
 will eventually address these other issues.
 </t>
 </section>
@@ -417,8 +372,8 @@ connection.
 
 <section title="Dictionary Attack">
 <t>
-The PSK MUST be set to a high entropy value. This is generally true for PSK in general, but
-Ephemeral PSK Identities are even more challenging:
+  The PSK MUST be high in entropy. This is true for PSKs in general,
+  but Ephemeral PSK Identities are even more challenging:
 </t>
 <t>
 <list style="symbol">
@@ -430,12 +385,12 @@ if the session was negotiated using the psk_dhe_ke mode.
 </t>
 <t>
 All clients of a given server will use the same nonce at the same time. That nonce
-is predictable by attackers, who can from a dictionary build "rainbow tables".
+is predictable by attackers, who can build "rainbow tables" from a dictionary.
 </t>
 </list>
 </t>
 <t>
-Implementations MUST guarantee that the PSK provide at least 128 bits of entropy.
+Implementations MUST guarantee that the PSK provides at least 128 bits of entropy.
 </t> 
 </section>
 
