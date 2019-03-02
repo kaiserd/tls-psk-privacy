@@ -214,11 +214,14 @@ The identity is composed as specified in <xref target="eph-id-gen" />.
 <t>
  <figure>
    <artwork>
+  original_psk_identity = PSK ID provisioned with the PSK
   timestamp = 64 bit Unix GMT time
   seed = 56 most significant bits of timestamp padded with 0s
   ephemeral_early_secret = HKDF-Extract(PSK, seed)
-  ephemeral_identity = HKDF-Expand-Label(ephemeral_early_secret,
-                                         "eph-id", hash.length)
+  ephemeral_identity = HKDF-Expand-Label(ephemeral_early_secret, 
+                                         "eph-id",
+                                         original_psk_identity,
+                                         hash.length)
 </artwork>
 </figure>
 </t>
@@ -227,9 +230,6 @@ The identity is composed as specified in <xref target="eph-id-gen" />.
   [[For efficiency reasons, we could also use ephemeral_identity = HKDF-Expand-Label(PSK, seed, "eph-id", hash.length),
   which would be similar to establishing session tickets;
   or even just HMAC(seed, PSK). But first generating a separate secret fits better into the TLS 1.3 key schedule.]]
-</t>
-<t>
-  [[Consider mixing the provisioned PSK Identity in the hash, for better resistance to dictionary attacks ]]
 </t>
 
 </section>
@@ -316,6 +316,24 @@ in frequent connection failures.
 </t>
 </section>
 
+<section title="Preventing Use Of Rainbow Tables" >
+<t>
+All clients of a given server will use the same nonce at the same
+time. That nonce is predictable by attackers. If the ephemeral ID was just
+a hash of the key and the nonce, attackers could build "rainbow tables".
+They would precompute the hash of the commonly use passwords or pass phrases
+with an upcoming nonce, and then test whether a matching value was used
+by any client using ephemeral ID.
+</t>
+<t>
+In our design, the ephemeral identity depends on the "original PSK identity"
+as well as the nonce and the PSK. The original PSK identity is provisioned
+at the same time as the PSK, and is unique to a client. Attackers will have
+to perform specific precomputations for every client, and cannot just
+precompute hashes and see whether a particular client uses it.
+</t>
+</section>
+
 <section title="Other Privacy Issues" anchor="mess-id">
   <t>
 Ephemeral PSK Identities contribute to client privacy, but they are not sufficient to
@@ -373,21 +391,11 @@ connection.
 <section title="Dictionary Attack">
 <t>
   The PSK MUST be high in entropy. This is true for PSKs in general,
-  but Ephemeral PSK Identities are even more challenging:
-</t>
-<t>
-<list style="symbol">
-<t>
+  but Ephemeral PSK Identities are even more challenging. 
 Adversaries can observe a connection attempt, note the value of the nonce, and perform
 a dictionary attack, using the Ephemeral PSK Identity value as an oracle. This is
 less challenging than trying to reproduce the whole handshake, and will succeed even
 if the session was negotiated using the psk_dhe_ke mode.
-</t>
-<t>
-All clients of a given server will use the same nonce at the same time. That nonce
-is predictable by attackers, who can build "rainbow tables" from a dictionary.
-</t>
-</list>
 </t>
 <t>
 Implementations MUST guarantee that the PSK provides at least 128 bits of entropy.
