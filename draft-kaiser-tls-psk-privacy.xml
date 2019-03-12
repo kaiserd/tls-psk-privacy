@@ -319,11 +319,17 @@ in frequent connection failures.
 <section title="Preventing Use Of Rainbow Tables" >
 <t>
 All clients of a given server will use the same nonce at the same
-time. That nonce is predictable by attackers. If the ephemeral ID was just
+time. That nonce is predictable by attackers.
+To avoid dictionary attacks, the PSK must provide at least 128 bits of entropy.
+Still we provide protection against the use of rainbow tables even
+in case an Implementation should choose weak PSKs.
+</t>
+<t>
+When using a weak PSK and the ephemeral ID was just
 a hash of the key and the nonce, attackers could build "rainbow tables".
-They would precompute the hash of the commonly use passwords or pass phrases
+They would precompute the hash of commonly used passwords or pass phrases
 with an upcoming nonce, and then test whether a matching value was used
-by any client using ephemeral ID.
+by any client using ephemeral IDs.
 </t>
 <t>
 In our design, the ephemeral identity depends on the "original PSK identity"
